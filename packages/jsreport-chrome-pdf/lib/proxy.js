@@ -64,7 +64,19 @@ module.exports = {
     return initPromise
   },
   close: () => {
-    return server.close()
+    // The server starts on the first jsreport:// resource (init), so most
+    // workers close without one. server.close() on undefined threw here, and
+    // the throw was synchronous, so the worker's close listener rejected before
+    // the browsers were closed and the worker exited on top of them.
+    if (!server) {
+      return Promise.resolve()
+    }
+
+    const current = server
+    server = null
+    initPromise = null
+
+    return new Promise((resolve) => current.close(() => resolve()))
   },
   makeUrl: (url, timeout) => {
     return `http://localhost:${server.address().port}/?url=${encodeURIComponent(url)}&timeout=${timeout}`
